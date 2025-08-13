@@ -1,4 +1,4 @@
-name: Deploy Python App
+name: Deploy Flask App to EC2
 
 on:
   push:
@@ -20,16 +20,17 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
 
-      - name: Copy files to EC2
-        run: |
-          scp -i ~/.ssh/id_rsa -r . ubuntu@${{ secrets.EC2_IP }}:/home/ubuntu/app
-
-      - name: Run Flask app on EC2
+      - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_IP }} << 'EOF'
             pkill -f app.py || true
-            cd /home/ubuntu/app
+            rm -rf ~/flaskapp
+            mkdir ~/flaskapp
+            cd ~/flaskapp
+            git clone https://github.com/apz-ns/devopswithaiman.git .
+            sudo apt update
+            sudo apt install python3-pip -y
             pip3 install -r requirements.txt
-            nohup python3 app.py --host=0.0.0.0 --port=5000 > app.log 2>&1 &
+            nohup python3 app.py > app.log 2>&1 &
           EOF
 
