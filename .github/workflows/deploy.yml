@@ -13,19 +13,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
+      - name: Set up SSH key
         run: |
-          pip install -r requirements.txt
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Copy files to EC2
         run: |
-          scp -i ${{ secrets.SSH_PRIVATE_KEY }} -r . ec2-user@${{ secrets.EC2_IP }}:/home/ec2-user/app
-          ssh -i ${{ secrets.SSH_PRIVATE_KEY }} ec2-user@${{ secrets.EC2_IP }} << 'EOF'
-            cd /home/ec2-user/app
-            nohup python3 app.py &
+          scp -i ~/.ssh/id_rsa -r . ubuntu@${{ secrets.EC2_IP }}:/home/ubuntu/app
+
+      - name: Run Flask app on EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_IP }} << 'EOF'
+            pkill -f app.py || true
+            cd /home/ubuntu/app
+            pip3 install -r requirements.txt
+            nohup python3 app.py --host=0.0.0.0 --port=5000 > app.log 2>&1 &
           EOF
+
